@@ -1,0 +1,204 @@
+- name: push and init PCF docker images  to openshift
+  hosts: localhost
+  tasks:
+
+
+# #oc login will be placed here
+#   - name: get token from openshift
+#     shell: |
+#        export MYTOKEN=`curl -u oracle:redhat2020 'https://oauth-openshift.apps.lab.local/oauth/authorize?client_id=openshift-challenging-client&response_type=token' -skv -H "X-CSRF-Token:xxx" --stderr - |  grep -oP "access_token=\K[^&]*"`
+#        /root/oc login --token=$MYTOKEN
+#        /root/oc project {{namespace}}}
+#     register: oc_ilogin_output 
+#   - name: debugging oc_ilogin_output
+#     debug:
+#       var: oc_ilogin_output
+
+#docker save occnp docker tar file
+  - name: Wait for all occnp docker images loaded, may be need 10 mins or more
+    shell: "docker load -i {{image_file_path}}"
+    register: ocpcf_docker_images_loaded
+    until: item in ocpcf_docker_images_loaded.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - occnp/oc-diam-connector:1.10.5
+      - occnp/ocingress_gateway:1.10.6
+      - occnp/oc-pcf-user:1.10.4
+      - occnp/oc-pcf-ue:1.10.2
+      - occnp/oc-pcrf-core:1.10.2
+      - occnp/oc-perf-info:1.10.0
+      - occnp/alternate_route:1.2.1
+      - occnp/oc-pcf-sm:1.10.5
+      - occnp/oc-audit:1.10.2
+      - occnp/oc-ldap-gateway:1.10.2
+      - occnp/oc-query:1.10.2
+      - occnp/oc-pre:1.10.0
+      - occnp/oc-diam-gateway:1.10.5
+      - occnp/oc-config-mgmt:1.10.2
+      - occnp/ocdebug-tools:1.0.0
+      - occnp/oc-binding:1.10.2
+      - occnp/oc-soap-connector:1.10.2
+      - occnp/oc-helm-test:1.10.2
+      - occnp/oc-app-info:1.10.0
+      - occnp/common_config_hook:1.1.1
+      - occnp/configurationupdate:1.7.0
+      - occnp/nrf-client:1.5.3
+      - occnp/oc-readiness-detector:1.10.5
+      - occnp/oc-policy-ds:1.10.5
+      - occnp/oc-config-server:1.10.2
+      - occnp/oc-pcf-am:1.10.2
+      - occnp/ocegress_gateway:1.10.1
+      - occnp/configurationinit:1.7.0
+
+
+#docker login to openshift docker registry
+  - name: docker login to openshift docker registry
+    shell: "docker login default-route-openshift-image-registry.apps.fudge.telenor.lab -u {{docker_registry_user}} -p {{docker_registry_password}}"
+    register: ocpcf_docker_login_docker_registry
+    until: item in ocpcf_docker_login_docker_registry.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login Succeeded
+
+#docker tag and push to openshift docker registry
+  - name: Wait for all occnp docker push to openshift docker registry, may be need 10 mins or more
+    shell: |
+        docker tag occnp/oc-diam-connector:1.10.5 {{push_docker_registry}}/{{namespace}}/oc-diam-connector:1.10.5
+        docker push {{push_docker_registry}}/{{namespace}}/oc-diam-connector:1.10.5
+        docker tag occnp/oc-pcf-sm:1.10.5 {{push_docker_registry}}/{{namespace}}/oc-pcf-sm:1.10.5
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pcf-sm:1.10.5
+        docker tag occnp/oc-diam-gateway:1.10.5 {{push_docker_registry}}/{{namespace}}/oc-diam-gateway:1.10.5
+        docker push {{push_docker_registry}}/{{namespace}}/oc-diam-gateway:1.10.5
+        docker tag occnp/oc-policy-ds:1.10.5 {{push_docker_registry}}/{{namespace}}/oc-policy-ds:1.10.5
+        docker push {{push_docker_registry}}/{{namespace}}/oc-policy-ds:1.10.5
+        docker tag occnp/ocingress_gateway:1.10.6 {{push_docker_registry}}/{{namespace}}/ocingress_gateway:1.10.6
+        docker push {{push_docker_registry}}/{{namespace}}/ocingress_gateway:1.10.6
+        docker tag occnp/oc-pcf-user:1.10.4 {{push_docker_registry}}/{{namespace}}/oc-pcf-user:1.10.4
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pcf-user:1.10.4
+        docker tag occnp/nrf-client:1.5.3 {{push_docker_registry}}/{{namespace}}/nrf-client:1.5.3
+        docker push {{push_docker_registry}}/{{namespace}}/nrf-client:1.5.3
+        docker tag occnp/oc-audit:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-audit:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-audit:1.10.2
+        docker tag occnp/oc-pcf-ue:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-pcf-ue:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pcf-ue:1.10.2
+        docker tag occnp/oc-ldap-gateway:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-ldap-gateway:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-ldap-gateway:1.10.2
+        docker tag occnp/oc-config-server:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-config-server:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-config-server:1.10.2
+        docker tag occnp/oc-pcrf-core:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-pcrf-core:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pcrf-core:1.10.2
+        docker tag occnp/oc-pcf-am:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-pcf-am:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pcf-am:1.10.2
+        docker tag occnp/oc-config-mgmt:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-config-mgmt:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-config-mgmt:1.10.2
+        docker tag occnp/oc-binding:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-binding:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-binding:1.10.2
+        docker tag occnp/oc-soap-connector:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-soap-connector:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-soap-connector:1.10.2
+        docker tag occnp/oc-query:1.10.2 {{push_docker_registry}}/{{namespace}}/oc-query:1.10.2
+        docker push {{push_docker_registry}}/{{namespace}}/oc-query:1.10.2
+        docker tag occnp/oc-pre:1.10.0 {{push_docker_registry}}/{{namespace}}/oc-pre:1.10.0
+        docker push {{push_docker_registry}}/{{namespace}}/oc-pre:1.10.0
+        docker tag occnp/oc-perf-info:1.10.0 {{push_docker_registry}}/{{namespace}}/oc-perf-info:1.10.0
+        docker push {{push_docker_registry}}/{{namespace}}/oc-perf-info:1.10.0
+        docker tag occnp/oc-app-info:1.10.0 {{push_docker_registry}}/{{namespace}}/oc-app-info:1.10.0
+        docker push {{push_docker_registry}}/{{namespace}}/oc-app-info:1.10.0
+        docker tag occnp/common_config_hook:1.1.1 {{push_docker_registry}}/{{namespace}}/common_config_hook:1.1.1
+        docker push {{push_docker_registry}}/{{namespace}}/common_config_hook:1.1.1
+        docker tag occnp/ocegress_gateway:1.10.1 {{push_docker_registry}}/{{namespace}}/ocegress_gateway:1.10.1
+        docker push {{push_docker_registry}}/{{namespace}}/ocegress_gateway:1.10.1
+        docker tag occnp/alternate_route:1.2.1 {{push_docker_registry}}/{{namespace}}/alternate_route:1.2.1
+        docker push {{push_docker_registry}}/{{namespace}}/alternate_route:1.2.1
+        docker tag occnp/configurationupdate:1.7.0 {{push_docker_registry}}/{{namespace}}/configurationupdate:1.7.0
+        docker push {{push_docker_registry}}/{{namespace}}/configurationupdate:1.7.0
+        docker tag occnp/configurationinit:1.7.0 {{push_docker_registry}}/{{namespace}}/configurationinit:1.7.0
+        docker push {{push_docker_registry}}/{{namespace}}/configurationinit:1.7.0
+        docker tag occnp/ocdebug-tools:1.0.0 {{push_docker_registry}}/{{namespace}}/ocdebug-tools:1.0.0
+        docker push {{push_docker_registry}}/{{namespace}}/ocdebug-tools:1.0.0
+        docker tag occnp/oc-readiness-detector:1.10.5 {{push_docker_registry}}/{{namespace}}/oc-readiness-detector:1.10.5
+        docker push {{push_docker_registry}}/{{namespace}}/oc-readiness-detector:1.10.5
+    register: ocpcf_docker_images_push
+    until: item in ocpcf_docker_images_push.stdout
+    retries: 3
+    delay: 30
+    with_items:
+      - "{{push_docker_registry}}/{{namespace}}/oc-diam-connector"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pcf-sm"
+      - "{{push_docker_registry}}/{{namespace}}/oc-diam-gateway"
+      - "{{push_docker_registry}}/{{namespace}}/oc-policy-ds"
+      - "{{push_docker_registry}}/{{namespace}}/ocingress_gateway"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pcf-user"
+      - "{{push_docker_registry}}/{{namespace}}/nrf-client"
+      - "{{push_docker_registry}}/{{namespace}}/oc-audit"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pcf-ue"
+      - "{{push_docker_registry}}/{{namespace}}/oc-ldap-gateway"
+      - "{{push_docker_registry}}/{{namespace}}/oc-config-server"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pcrf-core"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pcf-am"
+      - "{{push_docker_registry}}/{{namespace}}/oc-config-mgmt"
+      - "{{push_docker_registry}}/{{namespace}}/oc-binding"
+      - "{{push_docker_registry}}/{{namespace}}/oc-soap-connector"
+      - "{{push_docker_registry}}/{{namespace}}/oc-query"
+      - "{{push_docker_registry}}/{{namespace}}/oc-pre"
+      - "{{push_docker_registry}}/{{namespace}}/oc-perf-info"
+      - "{{push_docker_registry}}/{{namespace}}/oc-app-info"
+      - "{{push_docker_registry}}/{{namespace}}/common_config_hook"
+      - "{{push_docker_registry}}/{{namespace}}/ocegress_gateway"
+      - "{{push_docker_registry}}/{{namespace}}/alternate_route"
+      - "{{push_docker_registry}}/{{namespace}}/configurationupdate"
+      - "{{push_docker_registry}}/{{namespace}}/configurationinit"
+      - "{{push_docker_registry}}/{{namespace}}/ocdebug-tools"
+      - "{{push_docker_registry}}/{{namespace}}/oc-readiness-detector"
+
+# #docker tag and push to openshift docker registry
+#   - name: Wait for all pcf docker push to openshift docker registry, may be need 10 mins or more
+#     shell: |
+#         docker images
+#         docker tag occnp/oc-diam-connector:1.10.5 {{push_docker_registry}}/{{namespace}}oc-diam-connector:1.10.5
+#         docker push {{push_docker_registry}}/{{namespace}}oc-diam-connector:1.10.5
+#         docker tag occnp/oc-pcf-sm:1.10.5 {{push_docker_registry}}/{{namespace}}oc-pcf-sm:1.10.5
+#         docker push {{push_docker_registry}}/{{namespace}}oc-pcf-sm:1.10.5
+#         docker tag occnp/oc-diam-gateway:1.10.5 {{push_docker_registry}}/{{namespace}}oc-diam-gateway:1.10.5
+#         docker push {{push_docker_registry}}/{{namespace}}oc-diam-gateway:1.10.5
+#         docker tag occnp/oc-policy-ds:1.10.5 {{push_docker_registry}}/{{namespace}}oc-policy-ds:1.10.5
+#         docker push {{push_docker_registry}}/{{namespace}}oc-policy-ds:1.10.5
+#         docker tag occnp/ocingress_gateway:1.10.6 {{push_docker_registry}}/{{namespace}}ocingress_gateway:1.10.6
+#         docker push {{push_docker_registry}}/{{namespace}}ocingress_gateway:1.10.6
+#         docker tag occnp/oc-pcf-user:1.10.4 {{push_docker_registry}}/{{namespace}}oc-pcf-user:1.10.4
+#         docker push {{push_docker_registry}}/{{namespace}}oc-pcf-user:1.10.4
+#         docker tag occnp/nrf-client:1.5.3 {{push_docker_registry}}/{{namespace}}nrf-client:1.5.3
+#         docker push {{push_docker_registry}}/{{namespace}}nrf-client:1.5.3
+#     register: ocpcf_docker_images_push
+#     until: item in ocpcf_docker_images_push.stdout
+#     retries: 3
+#     delay: 30
+#     with_items:
+#       - {{push_docker_registry}}/{{namespace}}oc-diam-connector
+#       - {{push_docker_registry}}/{{namespace}}oc-pcf-sm
+#       - {{push_docker_registry}}/{{namespace}}oc-diam-gateway
+#       - {{push_docker_registry}}/{{namespace}}oc-policy-ds
+#       - {{push_docker_registry}}/{{namespace}}ocingress_gateway
+#       - {{push_docker_registry}}/{{namespace}}oc-pcf-user
+#       - {{push_docker_registry}}/{{namespace}}nrf-client
+#       - {{push_docker_registry}}/{{namespace}}oc-audit
+#       - {{push_docker_registry}}/{{namespace}}oc-pcf-ue
+#       - {{push_docker_registry}}/{{namespace}}oc-ldap-gateway
+#       - {{push_docker_registry}}/{{namespace}}oc-config-server
+#       - {{push_docker_registry}}/{{namespace}}oc-pcrf-core
+#       - {{push_docker_registry}}/{{namespace}}oc-pcf-am
+#       - {{push_docker_registry}}/{{namespace}}oc-config-mgmt
+#       - {{push_docker_registry}}/{{namespace}}oc-binding
+#       - {{push_docker_registry}}/{{namespace}}oc-soap-connector
+#       - {{push_docker_registry}}/{{namespace}}oc-query
+#       - {{push_docker_registry}}/{{namespace}}oc-pre
+#       - {{push_docker_registry}}/{{namespace}}oc-perf-info
+#       - {{push_docker_registry}}/{{namespace}}oc-app-info
+#       - {{push_docker_registry}}/{{namespace}}common_config_hook
+#       - {{push_docker_registry}}/{{namespace}}ocegress_gateway
+#       - {{push_docker_registry}}/{{namespace}}alternate_route
+#       - {{push_docker_registry}}/{{namespace}}configurationupdate
+#       - {{push_docker_registry}}/{{namespace}}configurationinit
+#       - {{push_docker_registry}}/{{namespace}}ocdebug-tools
+#       - {{push_docker_registry}}/{{namespace}}oc-readiness-detector

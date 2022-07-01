@@ -1,0 +1,93 @@
+- name: deploy OPCF to openshift
+  hosts: 10.6.1.6
+  vars:
+    namespace: oracle-defence-pcf
+    docker_registry_user: oracle
+    docker_registry_password: oracle123
+    push_docker_registry: hubcluster-registry-quay-quay-enterprise.apps.mgmt.next.lab
+    install_path: /home/oracle/NFs/PCF
+    playbook_path: /home/oracle/telenorPlaybooks/PCF
+    custom_file: occnp-22.1.0-custom-DEFENCE-values-pcf-minimal.yaml
+  tasks:
+# oc login will be placed here
+  - name: oc login
+    shell: "oc login -u oracle -p oracle123 https://api.secure.next.lab:6443"
+    register: oc_login
+    until: item in oc_login.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login successful
+
+#docker login to openshift docker registry
+  - name: docker login to openshift docker registry
+    shell: "podman login {{push_docker_registry}} -u {{docker_registry_user}} -p {{docker_registry_password}}"
+    register: ocpcf_docker_login_docker_registry
+    until: item in ocpcf_docker_login_docker_registry.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login Succeeded
+
+#create oc project in openshift
+  - name: create oc project in openshift
+    shell: |
+        kubectl delete ns {{namespace}}
+                sleep 60
+                kubectl create ns {{namespace}}
+                sleep 10
+            register: oc_create_project_output
+          - name: debugging oc_create_project_output
+            debug:
+              var: oc_create_project_output
+
+
+        #Create DB Secrets
+          - name: create db secrets
+            shell: |
+                kubectl create -f {{playbook_path}}/appuser-secret.yaml -n {{namespace}}
+                kubectl create -f {{playbook_path}}/privilegeduser-secret.yaml -n {{namespace}}
+                kubectl create secret docker-registry quay  --docker-server=hubcluster-registry-quay-quay-enterprise.apps.mgmt.next.lab/oracle --docker-username=oracle --docker-password=oracle123 --docker-email=alain.oteo.gonzalez@oracle.com -n {{namespace}}
+            register: create_db_secrets
+          - name: debugging create_db_secrets
+            debug:
+              var: create_db_secrets
+        #create service account
+          - name: create service account
+            shell: |
+                kubectl apply -f {{playbook_path}}/ocpcf-resource-template.yaml -n {{namespace}}
+                sleep 10
+                kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "quay"}]}' -n {{namespace}}
+            register: create_svcaccount
+          - name: debugging create_svcaccount
+            debug:
+              var: create_svcaccount
+
+        #create ocpcf mysql db
+          - name: create ocpcf mysql db
+            shell: |
+                kubectl create -f {{playbook_path}}/ocpcf-mysql-pvc.yaml -n {{namespace}}
+                sleep 10
+                kubectl create -f {{playbook_path}}/mysql-pcf-deployment.yaml -n {{namespace}}
+                sleep 60
+
+    register: oc_create_ocpcf_db_output
+  - name: debugging oc_create_ocpcf_db_output
+    debug:
+      var: oc_create_ocpcf_db_output
+
+#init DB
+  - name: init ocpcf mysql db
+    shell: kubectl -n {{namespace}} exec -it $(kubectl  -n {{namespace}} get pods| grep mysql-pcf ) --  /usr/bin/mysql -proot -uroot <  {{playbook_path}}/ocpcf-db-resource-standalone.sql
+    register: oc_db_create
+  - name: debugging oc_db_create
+    debug:
+      var: oc_db_create
+
+#helm install OCPCF
+  - name: helm install occnp
+    shell: helm install occnp --namespace {{namespace}} {{install_path}}/occnp-22.1.0.tgz -f {{install_path}}/{{custom_file}}
+    register: helm_install
+  - name: debugging helm_install
+    debug:
+      var: helm_install
