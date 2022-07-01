@@ -1,0 +1,95 @@
+- name: deploy and init NRF DB  to openshift
+  hosts: 10.6.1.6
+  vars:
+    namespace: oracle-defence-nrf
+    docker_registry_user: oracle
+    docker_registry_password: oracle123
+    push_docker_registry: hubcluster-registry-quay-quay-enterprise.apps.mgmt.next.lab
+    install_path: /home/oracle/NFs/NRF
+    playbook_path: /home/oracle/telenorPlaybooks/NRF
+    custom_file: ocnrf-Defence-custom-values-22-1.yaml
+  tasks:
+  - name: oc login
+    shell: "oc login -u oracle -p oracle123 https://api.secure.next.lab:6443"
+    register: oc_login
+    until: item in oc_login.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login successful
+
+#docker login to openshift docker registry
+  - name: docker login to openshift docker registry
+    shell: "podman login {{push_docker_registry}} -u {{docker_registry_user}} -p {{docker_registry_password}}"
+    register: ocnrf_docker_login_docker_registry
+    until: item in ocnrf_docker_login_docker_registry.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login Succeeded
+
+#create oc project in openshift
+  - name: create oc project in openshift
+    shell: |
+        kubectl delete ns {{namespace}}
+        sleep 60
+        kubectl create ns {{namespace}}
+        sleep 10
+    register: oc_create_project_output
+  - name: debugging oc_create_project_output
+    debug:
+      var: oc_create_project_output
+
+
+#Create DB Secrets
+  - name: create db secrets
+    shell: |
+        kubectl create secret generic privilegeduser-secret --from-literal=dbUsername=nrfPrivilegedUsr --from-literal=dbPassword=nrfPrivilegedPasswd --from-literal=appDbName=nrfApplicationDB --from-literal=networkScopedDbName=nrfNetworkDB --from-literal=commonConfigDbName=commonConfigurationDB -n {{namespace}}
+        kubectl create secret generic appuser-secret --from-literal=dbUsername=nrfApplicationUsr --from-literal=dbPassword=nrfApplicationPasswd --from-literal=appDbName=nrfApplicationDB -n {{namespace}}
+        kubectl create secret docker-registry quay  --docker-server=hubcluster-registry-quay-quay-enterprise.apps.mgmt.next.lab/oracle --docker-username=oracle --docker-password=oracle123 --docker-email=alain.oteo.gonzalez@oracle.com -n {{namespace}}
+
+    register: create_db_secrets
+  - name: debugging create_db_secrets
+    debug:
+      var: create_db_secrets
+
+#create service account
+  - name: create service account
+    shell: |
+        kubectl apply -f {{playbook_path}}/ocnrf-resource-template.yaml -n {{namespace}}
+        sleep 10
+        kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "quay"}]}' -n {{namespace}}
+    register: create_svcaccount
+  - name: debugging create_svcaccount
+    debug:
+      var: create_svcaccount
+#create ocnrf mysql db
+  - name: create ocnrf mysql db
+    shell: |
+        kubectl create -f {{playbook_path}}/ocnrf-mysql-pvc.yaml -n {{namespace}}
+        sleep 10
+        kubectl create -f {{playbook_path}}/mysql-nrf-deployment.yaml -n {{namespace}}
+        sleep 60
+    register: oc_create_ocnrf_db_output
+  - name: debugging oc_create_ocnrf_db_output
+    debug:
+      var: oc_create_ocnrf_db_output
+      
+
+#init DB
+  - name: init ocnrf mysql db
+    shell: kubectl -n {{namespace}} exec -it $(kubectl get pods -n {{namespace}} | grep mysql-nrf ) --  /usr/bin/mysql -proot -uroot <  {{playbook_path}}/ocnrf-db-resource-standalone.sql
+    register: oc_db_create
+  - name: debugging oc_db_create
+    debug:
+      var: oc_db_create
+
+
+#helm install OCNRF
+  - name: helm install ocnrf
+    shell: helm install ocnrf --namespace {{namespace}} {{install_path}}/ocnrf-22.1.0.tgz -f {{install_path}}/{{custom_file}}
+    register: helm_install
+  - name: debugging helm_install
+    debug:
+      var: helm_install
+
