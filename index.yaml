@@ -100,7 +100,7 @@ entries:
     digest: 97950da595dfc8f690f1f6e3ad8324c80f7f8024363a3b96b8be93da58344c50
     name: occnp
     urls:
-    - https://github.com/Telenor-Labs/Oracle/raw/gh-pages/helmCharts/ocnssf-22.1.1.tgz
+    - https://github.com/Telenor-Labs/Oracle/raw/gh-pages/helmCharts/ocpcf-22.1.0.tgz
     version: 22.1.0
   ocnrf:
   - apiVersion: v2
@@ -154,7 +154,7 @@ entries:
     name: ocnrf
     type: application
     urls:
-    - https://github.com/Telenor-Labs/Oracle/raw/gh-pages/helmCharts/ocnssf-22.1.1.tgz
+    - https://github.com/Telenor-Labs/Oracle/raw/gh-pages/helmCharts/ocnrf-22.1.0.tgz
     version: 22.1.0
   ocnssf:
   - apiVersion: v1
