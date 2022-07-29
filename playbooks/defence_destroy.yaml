@@ -10,12 +10,12 @@
     with_items:
       - Login successful
 
-#create oc project in openshift
-  - name: create oc project in openshift
+#delete oc project in openshift
+  - name: delete oc project in openshift
     shell: |
         kubectl delete ns {{namespace}}
         sleep 60
-    register: oc_create_project_output
-  - name: debugging oc_create_project_output
+    register: oc_delete_project_output
+  - name: debugging oc_delete_project_output
     debug:
-      var: oc_create_project_output
+      var: oc_delete_project_output
