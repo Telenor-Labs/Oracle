@@ -1,0 +1,21 @@
+- name: destroy defence NF
+  hosts: 10.6.1.6
+  tasks:
+  - name: oc login
+    shell: "oc login -u oracle -p oracle123 https://api.secure.next.lab:6443"
+    register: oc_login
+    until: item in oc_login.stdout
+    retries: 10
+    delay: 30
+    with_items:
+      - Login successful
+
+#create oc project in openshift
+  - name: create oc project in openshift
+    shell: |
+        kubectl delete ns {{namespace}}
+        sleep 60
+    register: oc_create_project_output
+  - name: debugging oc_create_project_output
+    debug:
+      var: oc_create_project_output
